@@ -28,7 +28,7 @@ systemctl --user restart pipewire wireplumber
 ### `50-audioengine-a2p-rate.conf` (PipeWire)
 - `default.clock.rate = 48000` — A2+ native 48k.
 - `default.clock.allowed-rates = [ 44100, 48000 ]` — nhạc 44.1k phát **native**, không resample.
-- `resample.quality = 10` — resampler tier cao cho file hi-res.
+- `resample.quality = 11` — tier "critical listening" (-140dB stopband). Chỉ có tác dụng KHI có resampling (file hi-res 96k/192k → 48k, hoặc nhạc 44.1k lúc graph đang 48k). Nhạc native 44.1k/48k phát BIT-PERFECT (không resample) nên mức này vô can.
 
 ### `50-audioengine-a2p-no-suspend.conf` (WirePlumber)
 - Tắt idle-suspend cho sink A2+ (`session.suspend-timeout-seconds = 0`) → DAC không ngủ → **không câm** (lỗi đã biết của USB DAC dưới PipeWire, đặc biệt lúc vào game).
