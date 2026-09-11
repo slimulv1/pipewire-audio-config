@@ -13,6 +13,8 @@ Môi trường test: Arch Linux, PipeWire 1.6.x, WirePlumber 0.5.x, dwm.
 pipewire/pipewire.conf.d/50-audioengine-a2p-rate.conf
 wireplumber/wireplumber.conf.d/50-audioengine-a2p-no-suspend.conf
 wireplumber/wireplumber.conf.d/50-epos-gsx300-gaming.conf
+wireplumber/wireplumber.conf.d/52-games-sink-routing.conf
+systemd/user/pw-loopback-games.service
 ```
 
 ## Cài đặt
@@ -20,6 +22,9 @@ wireplumber/wireplumber.conf.d/50-epos-gsx300-gaming.conf
 ```bash
 cp -r pipewire/*   ~/.config/pipewire/
 cp -r wireplumber/* ~/.config/wireplumber/
+cp -r systemd/user/* ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now pw-loopback-games.service
 systemctl --user restart pipewire wireplumber
 ```
 
@@ -40,12 +45,21 @@ systemctl --user restart pipewire wireplumber
 - `audio.rate = 48000` pin (EPOS **không hỗ trợ 44100**).
 - `audio.format = S24_3LE`, `audio.channels = 2` pin (24-bit stereo native).
 
+### `52-games-sink-routing.conf` + `pw-loopback-games.service` — hết rè game trên A2+ (giữ 7.1 cho nhạc)
+- **Vấn đề**: sink A2+ chạy profile "HiFi 7+1" (S32LE, 8 kênh) nhưng loa vật lý là **stereo** — khi game phát 5.1/7.1, 8 kênh nguyên vẹn qua USB và **firmware bên trong A2+ tự trộn 8→2 KHÔNG normalize → clip → rè** khi có nhiều âm lớn cùng lúc. Nhạc (stereo) không bao giờ chạm đường này.
+- **Giải pháp**: `systemd/user/pw-loopback-games.service` tạo sink stereo ảo **`games_sink`** (pw-loopback, capture stereo, playback `target.object` = A2+ 7.1 sink). Game → `games_sink` (2 kênh) → loopback đẩy 2ch sang A2+ → PipeWire upmix 2→8 (không thể clip). Nhạc vẫn đi thẳng A2+ 7.1.
+- **Routing**: `52-games-sink-routing.conf` tự route client `proton/wine/gamescope/reaper` → `games_sink`. Lưu ý: KHÔNG match `*steam*` (Steam client nhạc/video giữ 7.1); binary stream game = tên exe (vd `Cyberpunk2077.exe`) nên rule **không bắt được game** → dùng launch option:
+  ```
+  PULSE_SINK=games_sink %command%
+  ```
+  (Steam → Properties → Launch Options; game native Linux thêm cả `SDL_AUDIODRIVER=pulseaudio` nếu cần.)
+
 ## Quirks đã xử lý
 
 - **A2+**: đường USB thực tế hiện trong ALSA là `"Generic USB Audio"` (DAC high-res 32-bit/192k), **KHÔNG phải** PCM2704C 16/48. Card tên `"Audioengine 2+"` thực chất là module Bluetooth (CSRA64210) bên trong loa, không phải đường USB DAC.
 - **EPOS GSX 300**: chip Conexant CX21988, 24-bit/96k, **stereo-only** (7.1 surround là Windows-only qua EPOS Gaming Suite, không có trên Linux). Lỗi suspend/resume là **#1** → bắt buộc tắt suspend.
 - Nút volume trên EPOS = gain analog local, **không** đồng bộ software trên Linux.
-- `lib32-libpulse` cần thiết cho game 32-bit / Proton có tiếng.
+- `lib32-libpulse` cần thiết cho game 32-bit / Proton có tiếng (đã có trên máy).
 
 ## Chuyển sang EPOS khi chơi game (thủ công)
 

@@ -1,0 +1,18 @@
+# Games Stereo Sink — route Steam/Proton game audio qua sink stereo ảo
+# để TRÁNH đường 7.1 (firmware A2+ trộn 8->2 không normalize -> clip/rè).
+# Sink stereo "games_sink" -> playback 2ch -> A2+ 7.1 sink (upmix, không clip).
+# Nhạc vẫn đi thẳng vào A2+ 7.1 như cũ (giữ hiệu ứng surround yêu thích).
+[Unit]
+Description=PipeWire Games Stereo Sink (pw-loopback -> A2+)
+After=pipewire.service pipewire-pulse.service wireplumber.service
+PartOf=pipewire.service
+Wants=pipewire.service wireplumber.service
+
+[Service]
+Type=exec
+ExecStart=/usr/bin/pw-loopback -n games_sink --capture-props '{ media.class = Audio/Sink node.name = games_sink node.description = "Games (Stereo)" audio.position = [ FL FR ] }' --playback-props '{ target.object = alsa_output.usb-Generic_USB_Audio-00.HiFi_7_1__Speaker__sink audio.position = [ FL FR ] }'
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target
