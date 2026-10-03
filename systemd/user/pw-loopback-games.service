@@ -1,18 +1,62 @@
-# Games Stereo Sink — route Steam/Proton game audio qua sink stereo ảo
-# để TRÁNH đường 7.1 (firmware A2+ trộn 8->2 không normalize -> clip/rè).
-# Sink stereo "games_sink" -> playback 2ch -> A2+ 7.1 sink (upmix, không clip).
-# Nhạc vẫn đi thẳng vào A2+ 7.1 như cũ (giữ hiệu ứng surround yêu thích).
+# ============================================================================
+#  Games Stereo Sink -> pw-loopback -> A2+ 7.1
+# ----------------------------------------------------------------------------
+#  Games phát stereo (2ch) -> games_sink -> upmix 2->8 -> A2+ (loa stereo thật)
+#  Giữ đúng mục tiêu: game KHÔNG bị loa làm hỏng/mất kênh, vẫn nghe stereo.
+#
+#  LỖI ĐÃ SỬA (đã tái hiện được):
+#  Bản cũ dùng `PartOf=pipewire.service` + `Restart=on-failure`.
+#  PartOf chỉ LAN truyền lệnh *stop* tới unit này. Khi `systemctl --user stop
+#  pipewire`, pw-loopback bị dừng theo; nhưng lệnh `start` sau đó KHÔNG lan
+#  truyền ngược lại (PartOf không lan truyền start) -> unit chết VĨNH VIỄN:
+#
+#    đo thực tế:
+#      systemctl --user stop pipewire ; systemctl --user start pipewire
+#      -> pw-loopback-games.service = inactive, MainPID=0, games_sink BIẾN MẤT
+#
+#  Sửa: bỏ `PartOf=` và dùng `Restart=always`.
+#  pw-loopback tự thoát khi mất kết nối tới daemon; `Restart=always` khiến nó
+#  tự tạo lại games_sink ngay khi pipewire quay lại - không cần can thiệp tay.
+#
+#  LỖI ĐÃ SỬA (rất quan trọng): games_sink từng bị chọn làm SINK MẶC ĐỊNH
+#  của toàn hệ thống -> mọi âm thanh (kể cả game) đều đi qua vòng loopback.
+#  Nguyên nhân: games_sink không thuộc device nào nên priority mặc định = 0,
+#  BẰNG với sink A2+. Khi đó PipeWire/WirePlumber phân định bằng
+#  object.serial, và games_sink được tạo TRƯỚC (service user khởi động sớm,
+#  DAC USB chưa enumerate) -> serial nhỏ hơn -> games_sink thắng.
+#  Bằng chứng trong log (s-default-nodes):
+#     considering games_sink: prio 0, route_prio 0
+#     -> selected games_sink: prio 0, route_prio 0
+#     set default node for default.audio.sink games_sink
+#
+#  Cách sửa: priority.session = -1000 (thấp hơn mọi sink thật)
+#  -> games_sink KHÔNG BAO GIỜ được chọn làm default; chỉ nhận stream khi
+#     script games-sink-routing.lua chủ động chỉ định.
+#
+#  Về `target.object` hard-code:
+#  ĐÃ kiểm chứng - nếu node A2+ không tồn tại (DAC chưa enumerate lúc boot,
+#  hoặc đang rút), PipeWire KHÔNG làm mất tiếng mà tự fallback sang default
+#  sink. Nên service vẫn an toàn.
+# ============================================================================
+
 [Unit]
 Description=PipeWire Games Stereo Sink (pw-loopback -> A2+)
+Documentation=man:pw-loopback(1)
 After=pipewire.service pipewire-pulse.service wireplumber.service
-PartOf=pipewire.service
 Wants=pipewire.service wireplumber.service
+# KHÔNG dùng PartOf= ở đây - xem giải thích bên trên.
 
 [Service]
 Type=exec
-ExecStart=/usr/bin/pw-loopback -n games_sink --capture-props '{ media.class = Audio/Sink node.name = games_sink node.description = "Games (Stereo)" audio.position = [ FL FR ] }' --playback-props '{ target.object = alsa_output.usb-Generic_USB_Audio-00.HiFi_7_1__Speaker__sink audio.position = [ FL FR ] }'
-Restart=on-failure
+ExecStart=/usr/bin/pw-loopback -n games_sink --capture-props '{ media.class = Audio/Sink node.name = games_sink node.description = "Games (Stereo)" node.pause-on-idle = false audio.position = [ FL FR ] priority.session = -1000 }' --playback-props '{ target.object = alsa_output.usb-Generic_USB_Audio-00.HiFi_7_1__Speaker__sink audio.position = [ FL FR ] }'
+
+# Tự phục hồi: daemon PipeWire restart -> games_sink tự hiện lại.
+Restart=always
 RestartSec=3
+
+# Cho phép tự thử lại vô hạn (PipeWire có thể vắng lâu lúc boot);
+# mỗi lần chỉ tốn một tiến trình nhẹ.
+StartLimitIntervalSec=0
 
 [Install]
 WantedBy=default.target
