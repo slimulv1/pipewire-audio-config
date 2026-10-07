@@ -48,7 +48,7 @@ Wants=pipewire.service wireplumber.service
 
 [Service]
 Type=exec
-ExecStart=/usr/bin/pw-loopback -n games_sink --capture-props '{ media.class = Audio/Sink node.name = games_sink node.description = "Games (Stereo)" node.pause-on-idle = false audio.position = [ FL FR ] priority.session = -1000 }' --playback-props '{ target.object = alsa_output.usb-Generic_USB_Audio-00.HiFi_7_1__Speaker__sink audio.position = [ FL FR ] }'
+ExecStart=/usr/bin/pw-loopback -n games_sink --capture-props '{ media.class = Audio/Sink node.name = games_sink node.description = "Games (Stereo)" node.pause-on-idle = false audio.position = [ FL FR ] priority.session = -1000 }' --playback-props '{ target.object = alsa_output.usb-Generic_USB_Audio-00.HiFi__Speaker__sink audio.position = [ FL FR ] }'
 
 # Tự phục hồi: daemon PipeWire restart -> games_sink tự hiện lại.
 Restart=always

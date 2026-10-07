@@ -37,6 +37,24 @@ systemctl --user enable --now pw-loopback-games.service
 # Áp dụng: PipeWire đọc context.properties lúc khởi động -> phải restart.
 systemctl --user restart pipewire pipewire-pulse wireplumber
 
+sleep 6
+
+# ---------------------------------------------------------------------------
+#  Ghim profile STEREO ("HiFi") cho A2+.
+#
+#  VÌ SAO BẮT BUỘC:
+#    A2+ là DAC high-speed, native 48kHz, chỉ có 2 kênh ra loa.
+#    Profile mặc định "HiFi 7+1" ép PipeWire gửi 8 kênh S32LE:
+#        8 x 4 x 48000 = 1.536.000 B/s = 12,288 Mbit/s
+#    nhưng bus USB 2.0 High-Speed (480M) chỉ cấp tối đa ~992 byte/ms
+#    (~7,9 Mbit/s isochronous) -> VƯỢT BĂNG THÔNG -> underrun, tiếng "rè".
+#    Profile "HiFi" (stereo) chỉ cần 384.000 B/s = 3,072 Mbit/s -> dư 4 lần.
+#
+#  WirePlumber nhớ profile đã chọn trong state, nên chạy lệnh này là đủ.
+# ---------------------------------------------------------------------------
+pactl set-card-profile alsa_card.usb-Generic_USB_Audio-00 HiFi 2>/dev/null || true
+sleep 4
+
 echo
 echo "Đợi WirePlumber dựng lại thiết bị rồi kiểm tra:"
 sleep 8
