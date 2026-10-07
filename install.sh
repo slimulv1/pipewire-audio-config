@@ -14,25 +14,17 @@ SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 PW_DIR="$HOME/.config/pipewire/pipewire.conf.d"
 WP_DIR="$HOME/.config/wireplumber/wireplumber.conf.d"
-WP_SCRIPTS="$HOME/.local/share/wireplumber/scripts"
 UNIT_DIR="$HOME/.config/systemd/user"
 
-mkdir -p "$PW_DIR" "$WP_DIR" "$WP_SCRIPTS" "$UNIT_DIR"
+mkdir -p "$PW_DIR" "$WP_DIR"
 
 # 1) PipeWire: context properties (clock rate, resample quality)
 cp -v "$SRC/pipewire/pipewire.conf.d/"*.conf "$PW_DIR/"
 
-# 2) WirePlumber: rules (suspend, device priority, format/rate)
+# 2) WirePlumber: rules (suspend, device priority)
 cp -v "$SRC/wireplumber/wireplumber.conf.d/"*.conf "$WP_DIR/"
 
-# 3) WirePlumber: Lua script -> đúng thư mục data của WP 0.5
-cp -v "$SRC/wireplumber/scripts/"*.lua "$WP_SCRIPTS/"
-
-# 4) systemd user unit
-cp -v "$SRC/systemd/user/"*.service "$UNIT_DIR/"
-
 systemctl --user daemon-reload
-systemctl --user enable --now pw-loopback-games.service
 
 # Áp dụng: PipeWire đọc context.properties lúc khởi động -> phải restart.
 systemctl --user restart pipewire pipewire-pulse wireplumber

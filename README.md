@@ -139,23 +139,59 @@ Cách đo: `pw-cat --record --target=<sink>` tạo monitor của sink trong Pipe
 
 ---
 
-## Cấu trúc
+## Thiết kế
 
 ```
 pipewire/pipewire.conf.d/50-audioengine-a2p-rate.conf
-    └─ context: clock 48k, cấm đổi rate, resample quality 11
+    └─ context: clock 48k, CHỈ cho phép 48k, resample quality 11
 wireplumber/wireplumber.conf.d/50-audioengine-a2p-no-suspend.conf
     └─ A2+: tắt idle-suspend + device.priority = 2000
 wireplumber/wireplumber.conf.d/50-epos-gsx300-gaming.conf
     └─ EPOS: S24_3LE @48k, latency 256/48000, tắt suspend
-wireplumber/wireplumber.conf.d/51-games-sink-routing-hook.conf
-    └─ đăng ký Lua hook
-wireplumber/scripts/games-sink-routing.lua
-    └─ hook select-target: game Wine/Proton -> games_sink
-systemd/user/pw-loopback-games.service
-    └─ games_sink stereo ảo -> A2+, tự phục hồi
 install.sh · diagnose.sh
 ```
+
+### Ba quyết định thiết kế, đều dựa trên đo
+
+**1. Profile A2+ phải là `HiFi` (stereo), không phải `HiFi 7+1`.**
+Đo băng thông USB, endpoint phát tối đa 186 byte/ms:
+
+| Profile | Băng thông | Kết luận |
+|---|---|---|
+| `HiFi` — 2ch S16LE 48k | 3,07 Mbit/s | an toàn |
+| `HiFi 7+1` — 8ch S32LE 48k | **12,29 Mbit/s** | **vượt bus** |
+
+`install.sh` ghim profile này; WirePlumber lưu vào state nên sống qua reboot.
+
+**2. `allowed-rates = [ 48000 ]` — cấm đổi rate của DAC.**
+
+```
+[ 44100, 48000 ] + client 44.1kHz -> PipeWire cấu hình lại DAC, mất nhịp, click
+[ 48000 ]        + client 44.1kHz -> DAC giữ nguyên native, resample cục bộ
+```
+
+**3. Bỏ hẳn `games_sink` (vòng loopback) — vì nay đã vô dụng.**
+
+Sau khi A2+ chuyển sang stereo, PipeWire tự downmix mọi nguồn về 2 kênh đúng
+cách. `games_sink` chỉ còn làm tốn thêm tài nguyên:
+
+| | Không games_sink | Có games_sink |
+|---|---|---|
+| CPU / 12s phát | **90 ms** | 150 ms (**+67%**) |
+| Số node trong graph | **12** | 14 |
+| Lỗi cần bảo trì | không | thêm 1 service, 1 script Lua, 1 rule |
+
+Nó **không** chống được clipping: đường game vẫn phải downmix 5.1→2.0 ở đâu đó,
+và phép downmix đó đo được gain **2,766× (+8,84 dB)** → clip trên **−8,8 dBFS/kênh**
+(đo: 5.1 ở −6 dBFS/kênh cho peak 1,0000 = clip; hạ volume còn 0,35 thì peak −1,14 dBFS).
+
+### GHI CHÚ: không ghim `audio.format`
+
+DAC A2+ chỉ nhận `S16_LE` (đo bằng `aplay --dump-hw-params -D hw:0,0`).
+Nhưng đặt `audio.format = S16_LE` qua `update-props` **không có tác dụng** —
+`pactl list sinks` vẫn báo `s32le`, vì định dạng được chốt lúc node/driver được
+tạo chứ không phải sau đó. ALSA tự đổi 32→16 bit ở tầng plug, không mất chất
+lượng. Vì vậy bỏ hẳn thay vì giữ một dòng cấu hình chết.
 
 ---
 
