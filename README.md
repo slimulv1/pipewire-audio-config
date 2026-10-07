@@ -189,6 +189,26 @@ Nó **không** chống được clipping: đường game vẫn phải downmix 5.
 và phép downmix đó đo được gain **2,766× (+8,84 dB)** → clip trên **−8,8 dBFS/kênh**
 (đo: 5.1 ở −6 dBFS/kênh cho peak 1,0000 = clip; hạ volume còn 0,35 thì peak −1,14 dBFS).
 
+### ⚠️ Nguyên nhân lớn nhất KHÔNG nằm trong PipeWire
+
+Đọc [STEAM-LAUNCH-OPTIONS.md](STEAM-LAUNCH-OPTIONS.md) trước. Tóm tắt:
+
+Launch options của game bạn có `PROTON_LOG=1` + `WINEDEBUG=+loaddll,+seh,+ntdll`.
+Đo được file log **963 MB**, nội dung lặp `trace:ntdll:RtlSetBits` liên tục.
+README Proton-CachyOS cảnh báo đúng trường hợp này:
+
+> *"Full tracing floods the log and **perturbs audio timing enough to cause
+> crackling** ... remove it for normal play."*
+
+Đây là lý do **tín hiệu số sạch hoàn toàn mà tai vẫn nghe rè**: nhiễu do ghi log
+nằm ở tầng hệ thống, không để lại dấu vết trong dữ liệu âm thanh.
+
+Launch options khuyến nghị:
+
+```
+SteamDeck=0 DXVK_HDR=1 ENABLE_LAYER_MESA_ANTI_LAG=1 PROTON_NO_STEAMINPUT=1 PROTON_PRIORITY_HIGH=1 PROTON_USE_PIPEWIRE=0 game-performance %command% -skip-launcher -dx12
+```
+
 ### Sửa "rè" ở game: nâng sàn latency (Proton#7568)
 
 Đây **không phải** lỗi cấu hình của bạn — là bug upstream đã ghi nhận:
