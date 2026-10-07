@@ -13,13 +13,17 @@ set -euo pipefail
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 PW_DIR="$HOME/.config/pipewire/pipewire.conf.d"
+PWP_DIR="$HOME/.config/pipewire/pipewire-pulse.conf.d"
 WP_DIR="$HOME/.config/wireplumber/wireplumber.conf.d"
 UNIT_DIR="$HOME/.config/systemd/user"
 
-mkdir -p "$PW_DIR" "$WP_DIR"
+mkdir -p "$PW_DIR" "$PWP_DIR" "$WP_DIR"
 
-# 1) PipeWire: context properties (clock rate, resample quality)
+# 1) PipeWire: context properties (clock rate, resample quality, latency floor)
 cp -v "$SRC/pipewire/pipewire.conf.d/"*.conf "$PW_DIR/"
+
+# 1b) pipewire-pulse: gia han buffer cho client Wine/Proton (Proton#7568)
+cp -v "$SRC/pipewire/pipewire-pulse.conf.d/"*.conf "$PWP_DIR/"
 
 # 2) WirePlumber: rules (suspend, device priority)
 cp -v "$SRC/wireplumber/wireplumber.conf.d/"*.conf "$WP_DIR/"

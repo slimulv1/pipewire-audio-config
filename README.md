@@ -144,6 +144,10 @@ Cách đo: `pw-cat --record --target=<sink>` tạo monitor của sink trong Pipe
 ```
 pipewire/pipewire.conf.d/50-audioengine-a2p-rate.conf
     └─ context: clock 48k, CHỈ cho phép 48k, resample quality 11
+pipewire/pipewire.conf.d/51-proton-latency-floor.conf
+    └─ sàn latency cho app Wine/Proton  (Proton#7568)
+pipewire/pipewire-pulse.conf.d/51-proton-pulse-timing.conf
+    └─ giới hạn buffer client libpulse  (Proton#7568)
 wireplumber/wireplumber.conf.d/50-audioengine-a2p-no-suspend.conf
     └─ A2+: tắt idle-suspend + device.priority = 2000
 wireplumber/wireplumber.conf.d/50-epos-gsx300-gaming.conf
@@ -184,6 +188,44 @@ cách. `games_sink` chỉ còn làm tốn thêm tài nguyên:
 Nó **không** chống được clipping: đường game vẫn phải downmix 5.1→2.0 ở đâu đó,
 và phép downmix đó đo được gain **2,766× (+8,84 dB)** → clip trên **−8,8 dBFS/kênh**
 (đo: 5.1 ở −6 dBFS/kênh cho peak 1,0000 = clip; hạ volume còn 0,35 thì peak −1,14 dBFS).
+
+### Sửa "rè" ở game: nâng sàn latency (Proton#7568)
+
+Đây **không phải** lỗi cấu hình của bạn — là bug upstream đã ghi nhận:
+
+> **ValveSoftware/Proton#7568** — *"Game's audio causes crackling when using
+> recent pipewire"* (braiam, kỹ sưng Valve; mở 2024-03-09, còn mở tới 2025-04-06)
+> *"pipewire since version 0.3.67 has implemented **tighter latency timings**.
+> There are multiple reports of Wine/Proton apps having issues."*
+> *"**native apps/games don't seem to have issues** with these configurations"*
+
+Đúng triệu chứng: ứng dụng Wine/Proton rè, ứng dụng native thì không.
+
+**Cơ chế:** PipeWire cho phép graph rơi tới `default.clock.min-quantum = 32`
+(32 mẫu @48 kHz = **0,67 ms**). Giá trị đó nhỏ hơn mức mà USB DAC và đường
+đệm của Wine định kỳ chịu được. Khi graph nhảy xuống đó, buffer không kịp
+lấp đầy giữa hai lần gián đoạn → rè.
+
+**Sửa** — nâng sàn lên 256 mẫu (5,33 ms):
+
+```
+default.clock.min-quantum   = 256     (mặc định gốc PipeWire: 32)
+default.clock.quantum-floor = 32      (mặc định gốc: 4)
+```
+
+Kèm nửa còn lại của workaround chính thức, cho client libpulse:
+
+```
+pulse.min.req = pulse.min.frag = pulse.min.quantum = 256/48000
+```
+
+**Đã kiểm chứng sàn có tác dụng:**
+
+```
+client yêu cầu latency 1ms  →  graph bị tôn lên 256 (5,33ms)  ✓
+```
+
+Không tăng độ trễ: quantum ổn định đo được vốn đã là 256.
 
 ### GHI CHÚ: không ghim `audio.format`
 
